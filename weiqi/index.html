@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0b0f1a" />
+<title>围棋 · 定式练习</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: #141a2b;
+    --panel-2: #1b2238;
+    --board: #dcb35c;
+    --board-line: #1a1a1a;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --accent: #60a5fa;
+    --good: #4ade80;
+    --bad: #f43f5e;
+    --warn: #fbbf24;
+    --border: #2a3247;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  body {
+    padding:
+      env(safe-area-inset-top)
+      env(safe-area-inset-right)
+      env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  header {
+    padding: 12px 16px 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .back {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px 12px 8px;
+  }
+  .tab {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 4px;
+    border-radius: 10px;
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .12s ease;
+  }
+  .tab.active { background: var(--accent); color: #0b0f1a; border-color: var(--accent); font-weight: 600; }
+  .tab:active { transform: scale(0.97); }
+
+  .status {
+    margin: 0 12px 8px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+  }
+  .status .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #000; border: 1px solid #444;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .status .dot.white { background: #fff; border-color: #999; }
+  .status b { color: var(--text); font-weight: 600; }
+  .status.good { color: var(--good); }
+  .status.bad { color: var(--bad); }
+  .status.warn { color: var(--warn); }
+
+  .board-wrap {
+    margin: 0 12px;
+    aspect-ratio: 1 / 1;
+    background: var(--board);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    position: relative;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+
+  .controls {
+    padding: 10px 12px 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .btn {
+    flex: 1;
+    min-width: 70px;
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    padding: 9px 8px;
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .12s ease, transform .05s ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; pointer-events: none; }
+  .btn.primary { background: var(--accent); color: #0b0f1a; border-color: var(--accent); font-weight: 600; }
+  .btn.danger { color: var(--bad); }
+  .btn.toggle.on { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
+
+  .panel {
+    margin: 8px 12px;
+    padding: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 13px;
+  }
+  .panel h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .joseki-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .joseki-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .joseki-item:active { background: #252d4d; }
+  .joseki-item.sel { border: 1px solid var(--accent); }
+  .joseki-item .name { flex: 1; }
+  .joseki-item .meta { color: var(--muted); font-size: 11px; }
+  .joseki-item .del {
+    background: transparent;
+    border: none;
+    color: var(--bad);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .empty { color: var(--muted); font-style: italic; padding: 6px 2px; }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+    -webkit-appearance: none;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row > * { flex: 1; }
+  .grow { flex-grow: 1; }
+  .gap8 { gap: 8px; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 12px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../">‹ 返回</a>
+    <h1>围棋 · 定式</h1>
+    <span style="width:40px"></span>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-mode="free">自由对弈</div>
+    <div class="tab" data-mode="record">录入定式</div>
+    <div class="tab" data-mode="practice">定式练习</div>
+  </div>
+
+  <div class="status" id="status">
+    <span class="dot" id="turnDot"></span>
+    <span id="statusText">黑先 · 自由对弈</span>
+  </div>
+
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="controls" id="controls"></div>
+
+  <div id="modePanel"></div>
+
+  <footer>长按棋子可清除 · 数据保存在本机</footer>
+
+<script>
+(() => {
+  const SIZE = 19;
+  const STAR_PTS = [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
+  const COL_LABELS = "ABCDEFGHJKLMNOPQRST"; // skip I
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const turnDot = document.getElementById('turnDot');
+  const controlsEl = document.getElementById('controls');
+  const modePanelEl = document.getElementById('modePanel');
+
+  // ----- State -----
+  let mode = 'free'; // free | record | practice
+  let board = empty();
+  let history = []; // [{x,y,c,captured:[{x,y,c}]}]
+  let turn = 1; // 1 black, 2 white
+
+  // Record mode
+  let recordPhase = 'setup'; // setup | recording
+  let recordSetup = []; // [{x,y,c}]
+  let recordMoves = []; // [{x,y,c}]
+  let recordFirstColor = 1;
+
+  // Practice mode
+  let practicePhase = 'pick'; // pick | extra | playing | done
+  let practiceJoseki = null;
+  let practiceExtra = []; // user-added stones before starting
+  let practiceStep = 0;
+  let practiceWrong = null; // {x,y}
+
+  // Setup helpers (used in record:setup and practice:extra)
+  let setupColor = 1; // which color to place when tapping in setup
+  let eraserOn = false;
+
+  // ----- Render -----
+  let cellSize = 0;
+  let margin = 0;
+
+  function empty() {
+    return Array.from({length: SIZE}, () => Array(SIZE).fill(0));
+  }
+  function copyBoard(b) { return b.map(r => r.slice()); }
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const size = Math.floor(Math.min(rect.width, rect.height));
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    margin = size * 0.035;
+    cellSize = (size - margin * 2) / (SIZE - 1);
+    draw();
+  }
+
+  function draw() {
+    const w = canvas.width / (window.devicePixelRatio || 1);
+    ctx.fillStyle = getCss('--board');
+    ctx.fillRect(0, 0, w, w);
+
+    // grid
+    ctx.strokeStyle = getCss('--board-line');
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < SIZE; i++) {
+      const p = margin + i * cellSize;
+      ctx.moveTo(margin, p); ctx.lineTo(margin + (SIZE-1)*cellSize, p);
+      ctx.moveTo(p, margin); ctx.lineTo(p, margin + (SIZE-1)*cellSize);
+    }
+    ctx.stroke();
+
+    // stars
+    ctx.fillStyle = getCss('--board-line');
+    for (const [x,y] of STAR_PTS) {
+      ctx.beginPath();
+      ctx.arc(margin + x*cellSize, margin + y*cellSize, cellSize * 0.12, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // coords
+    ctx.fillStyle = '#5a4517';
+    ctx.font = `${Math.max(9, cellSize * 0.36)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = 0; i < SIZE; i++) {
+      ctx.fillText(COL_LABELS[i], margin + i*cellSize, margin * 0.45);
+      ctx.fillText(String(SIZE - i), margin * 0.45, margin + i*cellSize);
+    }
+
+    // stones
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (board[y][x]) drawStone(x, y, board[y][x]);
+      }
+    }
+
+    // overlays for practice / record
+    drawOverlays();
+  }
+
+  function drawStone(x, y, c, alpha = 1) {
+    const cx = margin + x * cellSize;
+    const cy = margin + y * cellSize;
+    const r = cellSize * 0.46;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.arc(cx + 1, cy + 2, r, 0, Math.PI*2); ctx.fill();
+    // stone
+    const grad = ctx.createRadialGradient(cx - r*0.3, cy - r*0.3, r*0.1, cx, cy, r);
+    if (c === 1) {
+      grad.addColorStop(0, '#555');
+      grad.addColorStop(1, '#000');
+    } else {
+      grad.addColorStop(0, '#fff');
+      grad.addColorStop(1, '#cfcfcf');
+    }
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawMarker(x, y, color, type='dot') {
+    const cx = margin + x*cellSize, cy = margin + y*cellSize;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+    if (type === 'circle') {
+      ctx.beginPath(); ctx.arc(cx, cy, cellSize * 0.2, 0, Math.PI*2); ctx.stroke();
+    } else if (type === 'cross') {
+      const s = cellSize * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(cx-s, cy-s); ctx.lineTo(cx+s, cy+s);
+      ctx.moveTo(cx-s, cy+s); ctx.lineTo(cx+s, cy-s);
+      ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(cx, cy, cellSize * 0.15, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawOverlays() {
+    // Mark last move
+    if (history.length > 0) {
+      const last = history[history.length - 1];
+      const col = last.c === 1 ? '#fff' : '#000';
+      drawMarker(last.x, last.y, col, 'circle');
+    }
+    // Practice wrong feedback
+    if (mode === 'practice' && practiceWrong) {
+      drawMarker(practiceWrong.x, practiceWrong.y, getCss('--bad'), 'cross');
+    }
+    // Record: show move numbers
+    if (mode === 'record' && recordPhase === 'recording') {
+      ctx.save();
+      ctx.font = `bold ${Math.max(10, cellSize*0.42)}px -apple-system, sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      recordMoves.forEach((m, i) => {
+        const cx = margin + m.x*cellSize, cy = margin + m.y*cellSize;
+        ctx.fillStyle = m.c === 1 ? '#fff' : '#000';
+        ctx.fillText(String(i+1), cx, cy);
+      });
+      ctx.restore();
+    }
+  }
+
+  function getCss(v) {
+    return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#000';
+  }
+
+  // ----- Go rules: liberties / capture -----
+  function neighbors(x, y) {
+    const r = [];
+    if (x > 0) r.push([x-1,y]);
+    if (x < SIZE-1) r.push([x+1,y]);
+    if (y > 0) r.push([x,y-1]);
+    if (y < SIZE-1) r.push([x,y+1]);
+    return r;
+  }
+  function groupOf(b, x, y) {
+    const c = b[y][x]; if (!c) return null;
+    const stack = [[x,y]]; const seen = new Set([x+','+y]); const stones = [];
+    let liberties = 0; const libSeen = new Set();
+    while (stack.length) {
+      const [px,py] = stack.pop(); stones.push([px,py]);
+      for (const [nx,ny] of neighbors(px,py)) {
+        const k = nx+','+ny;
+        const v = b[ny][nx];
+        if (v === 0) { if (!libSeen.has(k)) { libSeen.add(k); liberties++; } }
+        else if (v === c && !seen.has(k)) { seen.add(k); stack.push([nx,ny]); }
+      }
+    }
+    return {stones, liberties};
+  }
+  function tryPlay(b, x, y, c) {
+    // returns {ok, captured} or {ok:false}
+    if (b[y][x] !== 0) return {ok:false};
+    b[y][x] = c;
+    const opp = c === 1 ? 2 : 1;
+    const captured = [];
+    for (const [nx,ny] of neighbors(x,y)) {
+      if (b[ny][nx] === opp) {
+        const g = groupOf(b, nx, ny);
+        if (g && g.liberties === 0) {
+          for (const [sx,sy] of g.stones) {
+            captured.push({x:sx,y:sy,c:opp});
+            b[sy][sx] = 0;
+          }
+        }
+      }
+    }
+    const self = groupOf(b, x, y);
+    if (self.liberties === 0 && captured.length === 0) {
+      b[y][x] = 0; // suicide
+      return {ok:false, reason:'禁着点'};
+    }
+    return {ok:true, captured};
+  }
+
+  // ----- Click handling -----
+  function pixelToBoard(px, py) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const x = (px - rect.left) * (canvas.width / rect.width) / dpr;
+    const y = (py - rect.top) * (canvas.height / rect.height) / dpr;
+    const bx = Math.round((x - margin) / cellSize);
+    const by = Math.round((y - margin) / cellSize);
+    if (bx < 0 || bx >= SIZE || by < 0 || by >= SIZE) return null;
+    // require near
+    const dx = (x - margin) - bx*cellSize;
+    const dy = (y - margin) - by*cellSize;
+    if (Math.hypot(dx, dy) > cellSize * 0.55) return null;
+    return {x: bx, y: by};
+  }
+
+  let pressTimer = null, pressedAt = null;
+  function onPointerDown(e) {
+    const t = e.touches ? e.touches[0] : e;
+    const p = pixelToBoard(t.clientX, t.clientY);
+    if (!p) return;
+    pressedAt = p;
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      onLongPress(p);
+    }, 500);
+  }
+  function onPointerUp(e) {
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    if (pressTimer) {
+      clearTimeout(pressTimer); pressTimer = null;
+      const p = pixelToBoard(t.clientX, t.clientY);
+      if (p && pressedAt && p.x === pressedAt.x && p.y === pressedAt.y) {
+        onTap(p);
+      }
+    }
+    pressedAt = null;
+  }
+  function onPointerCancel() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    pressedAt = null;
+  }
+
+  function onTap(p) {
+    if (mode === 'free') {
+      playMove(p.x, p.y, turn);
+    } else if (mode === 'record') {
+      if (recordPhase === 'setup') setupPlace(p.x, p.y);
+      else recordPlay(p.x, p.y);
+    } else if (mode === 'practice') {
+      if (practicePhase === 'extra') setupPlace(p.x, p.y);
+      else if (practicePhase === 'playing') practiceAttempt(p.x, p.y);
+    }
+  }
+  function onLongPress(p) {
+    if (board[p.y][p.x] === 0) return;
+    if (mode === 'free') return; // no removal in free
+    if ((mode === 'record' && recordPhase === 'setup') ||
+        (mode === 'practice' && practicePhase === 'extra')) {
+      board[p.y][p.x] = 0;
+      if (mode === 'record') {
+        recordSetup = recordSetup.filter(s => !(s.x===p.x && s.y===p.y));
+      } else {
+        practiceExtra = practiceExtra.filter(s => !(s.x===p.x && s.y===p.y));
+      }
+      draw();
+    }
+  }
+
+  canvas.addEventListener('touchstart', onPointerDown, {passive:true});
+  canvas.addEventListener('touchend', onPointerUp);
+  canvas.addEventListener('touchcancel', onPointerCancel);
+  canvas.addEventListener('mousedown', onPointerDown);
+  canvas.addEventListener('mouseup', onPointerUp);
+
+  // ----- Free play -----
+  function playMove(x, y, c) {
+    const next = copyBoard(board);
+    const r = tryPlay(next, x, y, c);
+    if (!r.ok) { setStatus('warn', `不能在此处落子${r.reason ? '：'+r.reason : ''}`); return false; }
+    board = next;
+    history.push({x, y, c, captured: r.captured});
+    turn = c === 1 ? 2 : 1;
+    draw();
+    updateStatus();
+    return true;
+  }
+  function undo() {
+    if (!history.length) return;
+    const last = history.pop();
+    board[last.y][last.x] = 0;
+    for (const s of last.captured) board[s.y][s.x] = s.c;
+    turn = last.c;
+    draw();
+    updateStatus();
+  }
+  function clearAll() {
+    board = empty(); history = []; turn = 1;
+    draw(); updateStatus();
+  }
+
+  // ----- Record mode -----
+  function setupPlace(x, y) {
+    if (board[y][x] !== 0) {
+      // overwrite if same color? no — clear via long press. Just block.
+      setStatus('warn', '此处已有棋子（长按可清除）');
+      return;
+    }
+    board[y][x] = setupColor;
+    const entry = {x, y, c: setupColor};
+    if (mode === 'record') recordSetup.push(entry);
+    else practiceExtra.push(entry);
+    draw();
+  }
+
+  function startRecording() {
+    recordPhase = 'recording';
+    turn = recordFirstColor;
+    history = []; // recording starts fresh; setup is fixed
+    recordMoves = [];
+    renderUI();
+    setStatus('good', '开始录制 — 落子顺序会被记住');
+  }
+  function recordPlay(x, y) {
+    const next = copyBoard(board);
+    const r = tryPlay(next, x, y, turn);
+    if (!r.ok) { setStatus('warn', '不能在此处落子'); return; }
+    board = next;
+    const move = {x, y, c: turn};
+    recordMoves.push(move);
+    history.push({...move, captured: r.captured});
+    turn = turn === 1 ? 2 : 1;
+    draw();
+    updateStatus();
+  }
+  function undoRecord() {
+    if (recordPhase === 'recording') {
+      if (!recordMoves.length) return;
+      const last = recordMoves.pop();
+      const h = history.pop();
+      board[last.y][last.x] = 0;
+      for (const s of h.captured) board[s.y][s.x] = s.c;
+      turn = last.c;
+      draw(); updateStatus();
+    } else {
+      if (!recordSetup.length) return;
+      const last = recordSetup.pop();
+      board[last.y][last.x] = 0;
+      draw();
+    }
+  }
+  function resetRecord() {
+    recordPhase = 'setup';
+    recordSetup = []; recordMoves = []; history = [];
+    board = empty(); turn = recordFirstColor;
+    renderUI(); draw(); updateStatus();
+  }
+  function saveJoseki() {
+    if (!recordMoves.length) { setStatus('warn', '至少录入一步'); return; }
+    const name = (document.getElementById('jName').value || '').trim();
+    if (!name) { setStatus('warn', '请输入定式名称'); return; }
+    const all = loadAll();
+    const item = {
+      id: Date.now() + '',
+      name,
+      setup: recordSetup.slice(),
+      moves: recordMoves.slice(),
+      firstColor: recordFirstColor,
+      created: Date.now(),
+    };
+    // overwrite by name if exists
+    const i = all.findIndex(x => x.name === name);
+    if (i >= 0) all[i] = {...all[i], ...item, id: all[i].id};
+    else all.push(item);
+    saveAll(all);
+    setStatus('good', `已保存：${name}`);
+    document.getElementById('jName').value = '';
+    renderUI();
+  }
+
+  // ----- Practice mode -----
+  function loadPractice(id) {
+    const all = loadAll();
+    const j = all.find(x => x.id === id);
+    if (!j) return;
+    practiceJoseki = j;
+    practicePhase = 'extra';
+    practiceExtra = [];
+    practiceStep = 0;
+    practiceWrong = null;
+    board = empty(); history = [];
+    for (const s of j.setup) board[s.y][s.x] = s.c;
+    turn = j.firstColor;
+    renderUI(); draw(); updateStatus();
+  }
+  function startPractice() {
+    if (!practiceJoseki) return;
+    practicePhase = 'playing';
+    practiceStep = 0;
+    practiceWrong = null;
+    turn = practiceJoseki.firstColor;
+    renderUI(); updateStatus();
+  }
+  function practiceAttempt(x, y) {
+    const expected = practiceJoseki.moves[practiceStep];
+    if (!expected) return;
+    if (x === expected.x && y === expected.y) {
+      const next = copyBoard(board);
+      const r = tryPlay(next, x, y, expected.c);
+      if (!r.ok) { setStatus('bad', '记录有误：此处无法落子'); return; }
+      board = next;
+      history.push({...expected, captured: r.captured});
+      practiceWrong = null;
+      practiceStep++;
+      if (practiceStep >= practiceJoseki.moves.length) {
+        practicePhase = 'done';
+        setStatus('good', `🎉 完成！共 ${practiceStep} 步`);
+      } else {
+        turn = practiceJoseki.moves[practiceStep].c;
+        setStatus('good', `第 ${practiceStep} 步 ✓`);
+      }
+      draw(); renderUI();
+    } else {
+      practiceWrong = {x, y};
+      setStatus('bad', `不对 · 正确位置：${COL_LABELS[expected.x]}${SIZE - expected.y}`);
+      draw();
+    }
+  }
+  function practiceHint() {
+    if (practicePhase !== 'playing') return;
+    const e = practiceJoseki.moves[practiceStep];
+    if (!e) return;
+    setStatus('warn', `提示：${COL_LABELS[e.x]}${SIZE - e.y}`);
+  }
+  function practiceShowNext() {
+    if (practicePhase !== 'playing') return;
+    const e = practiceJoseki.moves[practiceStep];
+    if (!e) return;
+    practiceAttempt(e.x, e.y);
+  }
+  function practiceReset() {
+    if (!practiceJoseki) return;
+    practicePhase = 'extra';
+    practiceExtra = [];
+    practiceStep = 0;
+    practiceWrong = null;
+    board = empty(); history = [];
+    for (const s of practiceJoseki.setup) board[s.y][s.x] = s.c;
+    turn = practiceJoseki.firstColor;
+    renderUI(); draw(); updateStatus();
+  }
+  function practiceUnpick() {
+    practiceJoseki = null;
+    practicePhase = 'pick';
+    practiceExtra = [];
+    practiceWrong = null;
+    board = empty(); history = []; turn = 1;
+    renderUI(); draw(); updateStatus();
+  }
+
+  // ----- Storage -----
+  function loadAll() {
+    try { return JSON.parse(localStorage.getItem('weiqi_joseki') || '[]'); }
+    catch { return []; }
+  }
+  function saveAll(a) { localStorage.setItem('weiqi_joseki', JSON.stringify(a)); }
+  function deleteJoseki(id) {
+    if (!confirm('删除此定式？')) return;
+    saveAll(loadAll().filter(x => x.id !== id));
+    if (practiceJoseki && practiceJoseki.id === id) practiceUnpick();
+    renderUI();
+  }
+
+  // ----- Status -----
+  function setStatus(kind, text) {
+    statusEl.classList.remove('good', 'bad', 'warn');
+    if (kind) statusEl.classList.add(kind);
+    statusText.textContent = text;
+    turnDot.style.display = 'none';
+  }
+  function updateStatus() {
+    statusEl.classList.remove('good', 'bad', 'warn');
+    turnDot.style.display = '';
+    let txt = '';
+    if (mode === 'free') {
+      txt = (turn === 1 ? '黑' : '白') + '方落子 · 已 ' + history.length + ' 手';
+    } else if (mode === 'record') {
+      if (recordPhase === 'setup') {
+        txt = `摆放初始棋子 · 当前色：${setupColor === 1 ? '黑' : '白'}`;
+      } else {
+        txt = `录制中 · ${turn === 1 ? '黑' : '白'}方 · 已 ${recordMoves.length} 步`;
+      }
+    } else if (mode === 'practice') {
+      if (practicePhase === 'pick') txt = '选择一个定式';
+      else if (practicePhase === 'extra') txt = `可摆放额外棋子 · 当前色：${setupColor === 1 ? '黑' : '白'}`;
+      else if (practicePhase === 'playing') txt = `第 ${practiceStep + 1} / ${practiceJoseki.moves.length} 步 · ${turn === 1 ? '黑' : '白'}方`;
+      else if (practicePhase === 'done') txt = `完成 · ${practiceJoseki.name}`;
+    }
+    statusText.textContent = txt;
+    turnDot.classList.toggle('white', turn === 2);
+  }
+
+  // ----- UI render -----
+  function renderUI() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+
+    // Controls bar
+    let html = '';
+    if (mode === 'free') {
+      html = `
+        <button class="btn" id="btnUndo">↶ 悔棋</button>
+        <button class="btn" id="btnPass">虚手</button>
+        <button class="btn danger" id="btnClear">清空</button>
+      `;
+    } else if (mode === 'record') {
+      if (recordPhase === 'setup') {
+        html = `
+          <button class="btn toggle ${setupColor===1?'on':''}" id="cBlack">● 黑</button>
+          <button class="btn toggle ${setupColor===2?'on':''}" id="cWhite">○ 白</button>
+          <button class="btn" id="btnUndo">↶ 撤销</button>
+          <button class="btn primary" id="btnStartRec">开始录制 ▶</button>
+        `;
+      } else {
+        html = `
+          <button class="btn" id="btnUndo">↶ 撤销一步</button>
+          <button class="btn danger" id="btnResetRec">重新摆棋</button>
+        `;
+      }
+    } else if (mode === 'practice') {
+      if (practicePhase === 'pick') html = '';
+      else if (practicePhase === 'extra') {
+        html = `
+          <button class="btn toggle ${setupColor===1?'on':''}" id="cBlack">● 黑</button>
+          <button class="btn toggle ${setupColor===2?'on':''}" id="cWhite">○ 白</button>
+          <button class="btn primary" id="btnStartPrac">开始练习 ▶</button>
+          <button class="btn danger" id="btnUnpick">换一个</button>
+        `;
+      } else if (practicePhase === 'playing') {
+        html = `
+          <button class="btn" id="btnHint">提示</button>
+          <button class="btn" id="btnShow">显示下一步</button>
+          <button class="btn danger" id="btnResetPrac">重新开始</button>
+        `;
+      } else if (practicePhase === 'done') {
+        html = `
+          <button class="btn primary" id="btnResetPrac">再来一次</button>
+          <button class="btn" id="btnUnpick">换一个</button>
+        `;
+      }
+    }
+    controlsEl.innerHTML = html;
+
+    // Mode panel
+    let mp = '';
+    if (mode === 'record') {
+      if (recordPhase === 'setup') {
+        mp = `
+          <div class="panel">
+            <h3>录制说明</h3>
+            <div class="hint">
+              1. 先点击棋盘摆放初始局面（可选）<br>
+              2. 选择"黑先"或"白先"<br>
+              3. 点"开始录制"，之后落子顺序会被记下
+            </div>
+            <div style="height:10px"></div>
+            <div class="row gap8">
+              <span style="flex:0 0 auto; color:var(--muted); font-size:12px;">第一手：</span>
+              <button class="btn toggle ${recordFirstColor===1?'on':''}" id="fBlack" style="flex:0 0 80px">● 黑先</button>
+              <button class="btn toggle ${recordFirstColor===2?'on':''}" id="fWhite" style="flex:0 0 80px">○ 白先</button>
+            </div>
+          </div>
+        `;
+      } else {
+        mp = `
+          <div class="panel">
+            <h3>保存定式</h3>
+            <div class="row gap8">
+              <input type="text" id="jName" placeholder="如：星位小飞挂角">
+              <button class="btn primary" id="btnSave" style="flex:0 0 70px">保存</button>
+            </div>
+          </div>
+        `;
+      }
+      // joseki list (for reference)
+      mp += renderJosekiList(null, false);
+    } else if (mode === 'practice') {
+      if (practicePhase === 'pick') {
+        mp = renderJosekiList(null, true);
+      } else {
+        mp = `
+          <div class="panel">
+            <h3>当前定式</h3>
+            <div><b>${practiceJoseki.name}</b> <span class="meta" style="color:var(--muted)">· ${practiceJoseki.moves.length} 步</span></div>
+            ${practicePhase === 'extra' ? `<div class="hint" style="margin-top:6px">摆好额外背景棋子后，点"开始练习"。这些额外棋子只用于本次练习，不会影响定式本身。</div>` : ''}
+          </div>
+        `;
+      }
+    }
+    modePanelEl.innerHTML = mp;
+    bindControlHandlers();
+    bindPanelHandlers();
+  }
+
+  function renderJosekiList(selectedId, clickable) {
+    const all = loadAll();
+    let html = `<div class="panel"><h3>已保存的定式 (${all.length})</h3>`;
+    if (!all.length) {
+      html += `<div class="empty">尚无定式，去"录入定式"添加一个</div>`;
+    } else {
+      html += `<div class="joseki-list">`;
+      for (const j of all) {
+        const sel = selectedId === j.id ? 'sel' : '';
+        html += `
+          <div class="joseki-item ${sel}" ${clickable ? `data-pick="${j.id}"` : ''}>
+            <div class="name">${escapeHtml(j.name)}</div>
+            <div class="meta">${j.moves.length}步</div>
+            <button class="del" data-del="${j.id}" aria-label="删除">🗑</button>
+          </div>
+        `;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function bindControlHandlers() {
+    const $ = id => document.getElementById(id);
+    $('btnUndo') && $('btnUndo').addEventListener('click', () => {
+      if (mode === 'free') undo();
+      else if (mode === 'record') undoRecord();
+    });
+    $('btnPass') && $('btnPass').addEventListener('click', () => {
+      turn = turn === 1 ? 2 : 1; updateStatus();
+    });
+    $('btnClear') && $('btnClear').addEventListener('click', () => {
+      if (history.length && !confirm('清空棋盘？')) return;
+      clearAll();
+    });
+    $('cBlack') && $('cBlack').addEventListener('click', () => { setupColor = 1; renderUI(); updateStatus(); });
+    $('cWhite') && $('cWhite').addEventListener('click', () => { setupColor = 2; renderUI(); updateStatus(); });
+    $('btnStartRec') && $('btnStartRec').addEventListener('click', startRecording);
+    $('btnResetRec') && $('btnResetRec').addEventListener('click', () => {
+      if (!confirm('放弃当前录制？')) return;
+      resetRecord();
+    });
+    $('btnStartPrac') && $('btnStartPrac').addEventListener('click', startPractice);
+    $('btnResetPrac') && $('btnResetPrac').addEventListener('click', practiceReset);
+    $('btnUnpick') && $('btnUnpick').addEventListener('click', practiceUnpick);
+    $('btnHint') && $('btnHint').addEventListener('click', practiceHint);
+    $('btnShow') && $('btnShow').addEventListener('click', practiceShowNext);
+  }
+
+  function bindPanelHandlers() {
+    const $ = id => document.getElementById(id);
+    $('fBlack') && $('fBlack').addEventListener('click', () => { recordFirstColor = 1; renderUI(); });
+    $('fWhite') && $('fWhite').addEventListener('click', () => { recordFirstColor = 2; renderUI(); });
+    $('btnSave') && $('btnSave').addEventListener('click', saveJoseki);
+
+    document.querySelectorAll('[data-pick]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-del]')) return;
+        loadPractice(el.dataset.pick);
+      });
+    });
+    document.querySelectorAll('[data-del]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteJoseki(el.dataset.del);
+      });
+    });
+  }
+
+  // ----- Mode switching -----
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      const newMode = t.dataset.mode;
+      if (newMode === mode) return;
+      mode = newMode;
+      // Reset state per mode
+      board = empty(); history = []; turn = 1;
+      if (mode === 'record') {
+        recordPhase = 'setup'; recordSetup = []; recordMoves = []; setupColor = 1; recordFirstColor = 1;
+      } else if (mode === 'practice') {
+        practicePhase = 'pick'; practiceJoseki = null; practiceExtra = []; practiceStep = 0; practiceWrong = null; setupColor = 1;
+      }
+      renderUI(); draw(); updateStatus();
+    });
+  });
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+
+  // init
+  renderUI();
+  resize();
+  updateStatus();
+})();
+</script>
+</body>
+</html>
