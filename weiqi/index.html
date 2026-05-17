@@ -227,10 +227,10 @@
   </header>
 
   <div class="tabs">
-    <div class="tab active" data-mode="free">自由</div>
+    <div class="tab" data-mode="free">自由</div>
     <div class="tab" data-mode="record">录入定式</div>
     <div class="tab" data-mode="practice">练习定式</div>
-    <div class="tab" data-mode="problem">题目</div>
+    <div class="tab active" data-mode="problem">题目</div>
   </div>
 
   <div class="status" id="status">
@@ -263,7 +263,7 @@
   const modePanelEl = document.getElementById('modePanel');
 
   // ----- State -----
-  let mode = 'free'; // free | record | practice | problem
+  let mode = 'problem'; // free | record | practice | problem
   let board = empty();
   let history = []; // [{x,y,c,captured:[{x,y,c}]}]
   let turn = 1; // 1 black, 2 white
