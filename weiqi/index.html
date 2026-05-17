@@ -1169,10 +1169,26 @@
       mp = `
         <div class="panel">
           <h3>从图片导入题目</h3>
-          <div class="hint">
-            1. 在 Claude 对话里发题目图片<br>
-            2. 让 Claude 转成 <code>【围棋题目】</code> 开头的文本<br>
-            3. 复制后点上方 <b>📥 导入</b>，App 会自动摆好
+          <div class="hint" style="margin-bottom:8px">
+            1. 复制下方提示语 → 发给 Claude，附上题目图<br>
+            2. Claude 回复后复制那段文本 → 点上方 <b>📥 导入</b>
+          </div>
+          <textarea id="aiPrompt" readonly style="width:100%; min-height:110px; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font-size:12px; line-height:1.5; resize:vertical;">请把这张围棋题目图转成下面格式的文本（19路全图，X=黑 O=白 .=空，列号A-T跳过I，行号1-19，行号小的在下方）：
+
+【围棋题目】
+先手：黑棋 或 白棋（题目里能看出就填）
+目标：杀棋 / 做活 / 吃子 ...（看不出就略）
+棋盘（X=黑 O=白 .=空）：
+   A B C D E F G H J K L M N O P Q R S T
+19 . . . . . . . . . . . . . . . . . . .
+（...19行）
+
+黑(N)：坐标列表
+白(N)：坐标列表
+
+只输出这段文本，不要别的解释。</textarea>
+          <div class="row gap8" style="margin-top:8px">
+            <button class="btn primary" id="btnCopyPrompt">📋 复制提示语</button>
           </div>
         </div>
         <div class="panel">
@@ -1294,6 +1310,10 @@
       renderUI(); updateStatus();
     });
     $('btnImport') && $('btnImport').addEventListener('click', importProblem);
+    $('btnCopyPrompt') && $('btnCopyPrompt').addEventListener('click', () => {
+      const ta = document.getElementById('aiPrompt');
+      if (ta) copyToClipboard(ta.value, '提示语');
+    });
   }
 
   function bindPanelHandlers() {
