@@ -881,6 +881,79 @@
     updateStatus();
   }
 
+  function parseProblemText(text) {
+    const result = { setup: [], firstColor: 1, goal: '', boardRowsFound: 0 };
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      const fm = line.match(/先手[：:]\s*(\S+)/);
+      if (fm) {
+        result.firstColor = (fm[1].includes('黑') || /^[Bb]/.test(fm[1])) ? 1 : 2;
+        continue;
+      }
+      const gm = line.match(/目标[：:]\s*(.+?)\s*$/);
+      if (gm) { result.goal = gm[1].trim(); continue; }
+      const rm = line.trim().match(/^(\d{1,2})\b(.+)$/);
+      if (!rm) continue;
+      const rowNum = parseInt(rm[1], 10);
+      if (rowNum < 1 || rowNum > 19) continue;
+      const cells = (rm[2].match(/[XOxo.]/g) || []);
+      if (cells.length !== SIZE) continue;
+      result.boardRowsFound++;
+      const y = SIZE - rowNum;
+      cells.forEach((c, x) => {
+        const u = c.toUpperCase();
+        if (u === 'X') result.setup.push({x, y, c: 1});
+        else if (u === 'O') result.setup.push({x, y, c: 2});
+      });
+    }
+    if (result.boardRowsFound === 0) {
+      // Coord-list fallback: "黑: K10 L11" / "Black: K10 L11"
+      const tryCoords = (re, color) => {
+        const m = text.match(re);
+        if (!m) return;
+        const tokens = m[1].match(/[A-HJ-Ta-hj-t]\d{1,2}/g) || [];
+        for (const t of tokens) {
+          const col = t[0].toUpperCase();
+          const x = COL_LABELS.indexOf(col);
+          const row = parseInt(t.slice(1), 10);
+          if (x < 0 || row < 1 || row > 19) continue;
+          result.setup.push({x, y: SIZE - row, c: color});
+        }
+      };
+      tryCoords(/(?:黑|Black|B)[（(]?\d*[)）]?[：:]\s*([^\n]+)/i, 1);
+      tryCoords(/(?:白|White|W)[（(]?\d*[)）]?[：:]\s*([^\n]+)/i, 2);
+    }
+    return result;
+  }
+
+  function applyImportText(text) {
+    const parsed = parseProblemText(text);
+    if (!parsed.setup.length) {
+      setStatus('bad', '未识别出棋子，请检查文本格式');
+      return;
+    }
+    if (problemSetup.length && !confirm(`导入会替换当前棋盘（${problemSetup.length}→${parsed.setup.length}子），继续？`)) return;
+    problemSetup = parsed.setup;
+    problemFirstColor = parsed.firstColor;
+    problemGoal = parsed.goal;
+    board = empty();
+    for (const s of problemSetup) board[s.y][s.x] = s.c;
+    draw();
+    renderUI();
+    updateStatus();
+    setStatus('good', `已导入 ${parsed.setup.length} 子${parsed.goal ? ' · '+parsed.goal : ''}`);
+  }
+
+  async function importProblem() {
+    let text = '';
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      try { text = await navigator.clipboard.readText(); } catch {}
+    }
+    if (!text) text = window.prompt('粘贴题目文本（来自 Claude 等 AI 的回复）：') || '';
+    if (!text.trim()) { setStatus('warn', '没有内容'); return; }
+    applyImportText(text);
+  }
+
   function undoProblem() {
     if (!problemSetup.length) return;
     const last = problemSetup.pop();
@@ -1041,6 +1114,7 @@
         <button class="btn toggle ${setupColor===2?'on':''}" id="cWhite">○ 白</button>
         <button class="btn toggle ${problemAlternate?'on':''}" id="btnAlt">↔ 交替</button>
         <button class="btn" id="btnUndoProb">↶ 撤销</button>
+        <button class="btn primary" id="btnImport">📥 导入</button>
         <button class="btn danger" id="btnResetProb">清空</button>
       `;
     }
@@ -1093,6 +1167,14 @@
       }
     } else if (mode === 'problem') {
       mp = `
+        <div class="panel">
+          <h3>从图片导入题目</h3>
+          <div class="hint">
+            1. 在 Claude 对话里发题目图片<br>
+            2. 让 Claude 转成 <code>【围棋题目】</code> 开头的文本<br>
+            3. 复制后点上方 <b>📥 导入</b>，App 会自动摆好
+          </div>
+        </div>
         <div class="panel">
           <h3>题目设置</h3>
           <div class="row gap8" style="margin-bottom:10px">
@@ -1211,6 +1293,7 @@
       problemAlternate = !problemAlternate;
       renderUI(); updateStatus();
     });
+    $('btnImport') && $('btnImport').addEventListener('click', importProblem);
   }
 
   function bindPanelHandlers() {
