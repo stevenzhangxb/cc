@@ -194,6 +194,26 @@
   }
   .empty { color: var(--muted); font-style: italic; padding: 6px 2px; }
 
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .chip {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .1s ease;
+  }
+  .chip:active { transform: scale(0.95); }
+  .chip.on { background: var(--accent); color: #0b0f1a; border-color: var(--accent); font-weight: 600; }
+
   input[type="text"] {
     width: 100%;
     background: var(--panel-2);
@@ -253,6 +273,15 @@
   const SIZE = 19;
   const STAR_PTS = [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
   const COL_LABELS = "ABCDEFGHJKLMNOPQRST"; // skip I
+
+  const GOAL_PRESETS = [
+    '杀棋', '做活',
+    '劫杀', '劫活',
+    '吃子', '救棋',
+    '切断', '连接',
+    '做眼', '破眼',
+    '最佳手', '攻防',
+  ];
 
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
@@ -1066,12 +1095,16 @@
       mp = `
         <div class="panel">
           <h3>题目设置</h3>
-          <div class="row gap8" style="margin-bottom:8px">
+          <div class="row gap8" style="margin-bottom:10px">
             <span style="flex:0 0 auto; color:var(--muted); font-size:12px;">先手：</span>
             <button class="btn toggle ${problemFirstColor===1?'on':''}" id="pBlack" style="flex:0 0 70px">● 黑先</button>
             <button class="btn toggle ${problemFirstColor===2?'on':''}" id="pWhite" style="flex:0 0 70px">○ 白先</button>
           </div>
-          <input type="text" id="pGoal" placeholder="目标（可选）：杀白角 / 黑棋活 / ..." value="${escapeHtml(problemGoal)}">
+          <div style="color:var(--muted); font-size:12px; margin-bottom:6px">目标（可选，点击选择或自行输入）</div>
+          <div class="chips">
+            ${GOAL_PRESETS.map(g => `<button class="chip ${problemGoal === g ? 'on' : ''}" data-goal="${escapeHtml(g)}">${escapeHtml(g)}</button>`).join('')}
+          </div>
+          <input type="text" id="pGoal" placeholder="或自定义目标，如：杀白角 / 黑棋活劫" value="${escapeHtml(problemGoal)}">
         </div>
         <div class="panel">
           <h3>保存到题库</h3>
@@ -1207,7 +1240,22 @@
     });
     $('pGoal') && $('pGoal').addEventListener('input', (e) => {
       problemGoal = e.target.value;
+      document.querySelectorAll('.chip[data-goal]').forEach(c => {
+        c.classList.toggle('on', c.dataset.goal === problemGoal);
+      });
       refreshProblemExport();
+    });
+    document.querySelectorAll('.chip[data-goal]').forEach(el => {
+      el.addEventListener('click', () => {
+        const g = el.dataset.goal;
+        problemGoal = (problemGoal === g) ? '' : g;
+        document.querySelectorAll('.chip[data-goal]').forEach(c => {
+          c.classList.toggle('on', c.dataset.goal === problemGoal);
+        });
+        const inp = document.getElementById('pGoal');
+        if (inp) inp.value = problemGoal;
+        refreshProblemExport();
+      });
     });
     $('btnCopyText') && $('btnCopyText').addEventListener('click', () => copyToClipboard(exportProblemText(), '题目'));
     $('btnCopySgf') && $('btnCopySgf').addEventListener('click', () => copyToClipboard(exportProblemSGF(), 'SGF'));
