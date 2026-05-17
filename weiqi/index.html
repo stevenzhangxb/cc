@@ -841,6 +841,15 @@
     updateStatus();
   }
 
+  function undoProblem() {
+    if (!problemSetup.length) return;
+    const last = problemSetup.pop();
+    board[last.y][last.x] = 0;
+    draw();
+    refreshProblemExport();
+    updateStatus();
+  }
+
   // ----- Storage -----
   function loadAll() {
     try { return JSON.parse(localStorage.getItem('weiqi_joseki') || '[]'); }
@@ -938,6 +947,7 @@
       html = `
         <button class="btn toggle ${setupColor===1?'on':''}" id="cBlack">● 黑</button>
         <button class="btn toggle ${setupColor===2?'on':''}" id="cWhite">○ 白</button>
+        <button class="btn" id="btnUndoProb">↶ 撤销</button>
         <button class="btn danger" id="btnResetProb">清空</button>
       `;
     }
@@ -1069,6 +1079,7 @@
     $('btnHint') && $('btnHint').addEventListener('click', practiceHint);
     $('btnShow') && $('btnShow').addEventListener('click', practiceShowNext);
     $('btnResetProb') && $('btnResetProb').addEventListener('click', resetProblem);
+    $('btnUndoProb') && $('btnUndoProb').addEventListener('click', undoProblem);
   }
 
   function bindPanelHandlers() {
