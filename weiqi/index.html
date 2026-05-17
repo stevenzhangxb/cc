@@ -227,9 +227,10 @@
   </header>
 
   <div class="tabs">
-    <div class="tab active" data-mode="free">自由对弈</div>
+    <div class="tab active" data-mode="free">自由</div>
     <div class="tab" data-mode="record">录入定式</div>
-    <div class="tab" data-mode="practice">定式练习</div>
+    <div class="tab" data-mode="practice">练习定式</div>
+    <div class="tab" data-mode="problem">题目</div>
   </div>
 
   <div class="status" id="status">
@@ -262,7 +263,7 @@
   const modePanelEl = document.getElementById('modePanel');
 
   // ----- State -----
-  let mode = 'free'; // free | record | practice
+  let mode = 'free'; // free | record | practice | problem
   let board = empty();
   let history = []; // [{x,y,c,captured:[{x,y,c}]}]
   let turn = 1; // 1 black, 2 white
@@ -279,6 +280,11 @@
   let practiceExtra = []; // user-added stones before starting
   let practiceStep = 0;
   let practiceWrong = null; // {x,y}
+
+  // Problem export mode
+  let problemSetup = []; // [{x,y,c}]
+  let problemFirstColor = 1;
+  let problemGoal = '';
 
   // Setup helpers (used in record:setup and practice:extra)
   let setupColor = 1; // which color to place when tapping in setup
@@ -522,18 +528,23 @@
     } else if (mode === 'practice') {
       if (practicePhase === 'extra') setupPlace(p.x, p.y);
       else if (practicePhase === 'playing') practiceAttempt(p.x, p.y);
+    } else if (mode === 'problem') {
+      setupPlace(p.x, p.y);
     }
   }
   function onLongPress(p) {
     if (board[p.y][p.x] === 0) return;
     if (mode === 'free') return; // no removal in free
     if ((mode === 'record' && recordPhase === 'setup') ||
-        (mode === 'practice' && practicePhase === 'extra')) {
+        (mode === 'practice' && practicePhase === 'extra') ||
+        mode === 'problem') {
       board[p.y][p.x] = 0;
       if (mode === 'record') {
         recordSetup = recordSetup.filter(s => !(s.x===p.x && s.y===p.y));
-      } else {
+      } else if (mode === 'practice') {
         practiceExtra = practiceExtra.filter(s => !(s.x===p.x && s.y===p.y));
+      } else {
+        problemSetup = problemSetup.filter(s => !(s.x===p.x && s.y===p.y));
       }
       draw();
     }
@@ -581,8 +592,10 @@
     board[y][x] = setupColor;
     const entry = {x, y, c: setupColor};
     if (mode === 'record') recordSetup.push(entry);
-    else practiceExtra.push(entry);
+    else if (mode === 'practice') practiceExtra.push(entry);
+    else if (mode === 'problem') problemSetup.push(entry);
     draw();
+    if (mode === 'problem') refreshProblemExport();
   }
 
   function startRecording() {
@@ -730,6 +743,104 @@
     renderUI(); draw(); updateStatus();
   }
 
+  // ----- Problem export -----
+  function exportProblemText() {
+    const lines = [];
+    lines.push('【围棋题目】');
+    lines.push(`先手：${problemFirstColor === 1 ? '黑棋' : '白棋'}`);
+    if (problemGoal.trim()) lines.push(`目标：${problemGoal.trim()}`);
+    lines.push('棋盘（X=黑 O=白 .=空）：');
+    lines.push('   ' + COL_LABELS.split('').join(' '));
+    for (let y = 0; y < SIZE; y++) {
+      const rowNum = SIZE - y;
+      const row = [];
+      for (let x = 0; x < SIZE; x++) {
+        const v = board[y][x];
+        row.push(v === 1 ? 'X' : v === 2 ? 'O' : '.');
+      }
+      lines.push(String(rowNum).padStart(2, ' ') + ' ' + row.join(' '));
+    }
+    const blacks = [], whites = [];
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const coord = COL_LABELS[x] + (SIZE - y);
+        if (board[y][x] === 1) blacks.push(coord);
+        else if (board[y][x] === 2) whites.push(coord);
+      }
+    }
+    lines.push('');
+    lines.push(`黑(${blacks.length})：${blacks.join(' ') || '(无)'}`);
+    lines.push(`白(${whites.length})：${whites.join(' ') || '(无)'}`);
+    return lines.join('\n');
+  }
+
+  function exportProblemSGF() {
+    const ab = [], aw = [];
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const c = String.fromCharCode(97 + x) + String.fromCharCode(97 + y);
+        if (board[y][x] === 1) ab.push(`[${c}]`);
+        else if (board[y][x] === 2) aw.push(`[${c}]`);
+      }
+    }
+    let s = '(;FF[4]GM[1]SZ[19]';
+    if (ab.length) s += 'AB' + ab.join('');
+    if (aw.length) s += 'AW' + aw.join('');
+    s += `PL[${problemFirstColor === 1 ? 'B' : 'W'}]`;
+    if (problemGoal.trim()) {
+      s += `C[${problemGoal.trim().replace(/[\\\]]/g, '\\$&')}]`;
+    }
+    s += ')';
+    return s;
+  }
+
+  function refreshProblemExport() {
+    const ta = document.getElementById('problemPreview');
+    if (ta) ta.value = exportProblemText();
+  }
+
+  function copyToClipboard(text, label) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => setStatus('good', `已复制${label}`),
+        () => fallbackCopy(text, label)
+      );
+    } else fallbackCopy(text, label);
+  }
+  function fallbackCopy(text, label) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      setStatus('good', `已复制${label}`);
+    } catch {
+      setStatus('bad', '复制失败，请手动选中');
+    }
+    document.body.removeChild(ta);
+  }
+
+  async function shareProblem() {
+    const text = exportProblemText();
+    if (navigator.share) {
+      try { await navigator.share({title: '围棋题目', text}); setStatus('good', '已分享'); }
+      catch {}
+    } else {
+      copyToClipboard(text, '题目');
+    }
+  }
+
+  function resetProblem() {
+    if (problemSetup.length && !confirm('清空当前题目？')) return;
+    problemSetup = []; problemGoal = '';
+    board = empty();
+    draw();
+    renderUI();
+    updateStatus();
+  }
+
   // ----- Storage -----
   function loadAll() {
     try { return JSON.parse(localStorage.getItem('weiqi_joseki') || '[]'); }
@@ -767,6 +878,10 @@
       else if (practicePhase === 'extra') txt = `可摆放额外棋子 · 当前色：${setupColor === 1 ? '黑' : '白'}`;
       else if (practicePhase === 'playing') txt = `第 ${practiceStep + 1} / ${practiceJoseki.moves.length} 步 · ${turn === 1 ? '黑' : '白'}方`;
       else if (practicePhase === 'done') txt = `完成 · ${practiceJoseki.name}`;
+    } else if (mode === 'problem') {
+      const n = problemSetup.length;
+      txt = `摆题 · 当前色：${setupColor === 1 ? '黑' : '白'} · 已摆 ${n} 子`;
+      turn = problemFirstColor;
     }
     statusText.textContent = txt;
     turnDot.classList.toggle('white', turn === 2);
@@ -819,6 +934,12 @@
           <button class="btn" id="btnUnpick">换一个</button>
         `;
       }
+    } else if (mode === 'problem') {
+      html = `
+        <button class="btn toggle ${setupColor===1?'on':''}" id="cBlack">● 黑</button>
+        <button class="btn toggle ${setupColor===2?'on':''}" id="cWhite">○ 白</button>
+        <button class="btn danger" id="btnResetProb">清空</button>
+      `;
     }
     controlsEl.innerHTML = html;
 
@@ -867,6 +988,28 @@
           </div>
         `;
       }
+    } else if (mode === 'problem') {
+      mp = `
+        <div class="panel">
+          <h3>题目设置</h3>
+          <div class="row gap8" style="margin-bottom:8px">
+            <span style="flex:0 0 auto; color:var(--muted); font-size:12px;">先手：</span>
+            <button class="btn toggle ${problemFirstColor===1?'on':''}" id="pBlack" style="flex:0 0 70px">● 黑先</button>
+            <button class="btn toggle ${problemFirstColor===2?'on':''}" id="pWhite" style="flex:0 0 70px">○ 白先</button>
+          </div>
+          <input type="text" id="pGoal" placeholder="目标（可选）：杀白角 / 黑棋活 / ..." value="${escapeHtml(problemGoal)}">
+        </div>
+        <div class="panel">
+          <h3>导出 — 复制后粘给 AI 解题</h3>
+          <textarea id="problemPreview" readonly style="width:100%; min-height:160px; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font-family:'SF Mono',Menlo,Consolas,monospace; font-size:11px; line-height:1.4; resize:vertical;"></textarea>
+          <div class="row gap8" style="margin-top:8px">
+            <button class="btn primary" id="btnCopyText">📋 复制题目</button>
+            <button class="btn" id="btnCopySgf">复制 SGF</button>
+            <button class="btn" id="btnShare">📤 分享</button>
+          </div>
+          <div class="hint" style="margin-top:8px">把复制的内容粘给 AI（如 Claude / ChatGPT），让它告诉你正确下法。</div>
+        </div>
+      `;
     }
     modePanelEl.innerHTML = mp;
     bindControlHandlers();
@@ -925,6 +1068,7 @@
     $('btnUnpick') && $('btnUnpick').addEventListener('click', practiceUnpick);
     $('btnHint') && $('btnHint').addEventListener('click', practiceHint);
     $('btnShow') && $('btnShow').addEventListener('click', practiceShowNext);
+    $('btnResetProb') && $('btnResetProb').addEventListener('click', resetProblem);
   }
 
   function bindPanelHandlers() {
@@ -945,6 +1089,22 @@
         deleteJoseki(el.dataset.del);
       });
     });
+
+    $('pBlack') && $('pBlack').addEventListener('click', () => {
+      problemFirstColor = 1; renderUI(); refreshProblemExport(); updateStatus();
+    });
+    $('pWhite') && $('pWhite').addEventListener('click', () => {
+      problemFirstColor = 2; renderUI(); refreshProblemExport(); updateStatus();
+    });
+    $('pGoal') && $('pGoal').addEventListener('input', (e) => {
+      problemGoal = e.target.value;
+      refreshProblemExport();
+    });
+    $('btnCopyText') && $('btnCopyText').addEventListener('click', () => copyToClipboard(exportProblemText(), '题目'));
+    $('btnCopySgf') && $('btnCopySgf').addEventListener('click', () => copyToClipboard(exportProblemSGF(), 'SGF'));
+    $('btnShare') && $('btnShare').addEventListener('click', shareProblem);
+
+    refreshProblemExport();
   }
 
   // ----- Mode switching -----
@@ -959,6 +1119,8 @@
         recordPhase = 'setup'; recordSetup = []; recordMoves = []; setupColor = 1; recordFirstColor = 1;
       } else if (mode === 'practice') {
         practicePhase = 'pick'; practiceJoseki = null; practiceExtra = []; practiceStep = 0; practiceWrong = null; setupColor = 1;
+      } else if (mode === 'problem') {
+        problemSetup = []; problemFirstColor = 1; problemGoal = ''; setupColor = 1;
       }
       renderUI(); draw(); updateStatus();
     });
