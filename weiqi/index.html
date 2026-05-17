@@ -874,6 +874,57 @@
     renderUI();
   }
 
+  function loadProblems() {
+    try { return JSON.parse(localStorage.getItem('weiqi_problems') || '[]'); }
+    catch { return []; }
+  }
+  function saveProblemsAll(a) { localStorage.setItem('weiqi_problems', JSON.stringify(a)); }
+  function saveCurrentProblem() {
+    if (!problemSetup.length) { setStatus('warn', '棋盘是空的'); return; }
+    const nameEl = document.getElementById('probName');
+    const name = (nameEl?.value || '').trim();
+    if (!name) { setStatus('warn', '请输入题目名称'); nameEl?.focus(); return; }
+    const all = loadProblems();
+    const item = {
+      id: Date.now() + '',
+      name,
+      setup: problemSetup.slice(),
+      firstColor: problemFirstColor,
+      goal: problemGoal,
+      created: Date.now(),
+    };
+    const i = all.findIndex(x => x.name === name);
+    if (i >= 0) {
+      if (!confirm(`已存在同名题目"${name}"，是否覆盖？`)) return;
+      all[i] = {...all[i], ...item, id: all[i].id};
+    } else {
+      all.push(item);
+    }
+    saveProblemsAll(all);
+    setStatus('good', `已保存：${name}`);
+    if (nameEl) nameEl.value = '';
+    renderUI();
+  }
+  function loadProblemById(id) {
+    const p = loadProblems().find(x => x.id === id);
+    if (!p) return;
+    if (problemSetup.length && !confirm('替换当前棋盘？')) return;
+    problemSetup = p.setup.slice();
+    problemFirstColor = p.firstColor;
+    problemGoal = p.goal || '';
+    board = empty();
+    for (const s of problemSetup) board[s.y][s.x] = s.c;
+    draw();
+    renderUI();
+    updateStatus();
+    setStatus('good', `已加载：${p.name}`);
+  }
+  function deleteProblemById(id) {
+    if (!confirm('删除此题目？')) return;
+    saveProblemsAll(loadProblems().filter(x => x.id !== id));
+    renderUI();
+  }
+
   // ----- Status -----
   function setStatus(kind, text) {
     statusEl.classList.remove('good', 'bad', 'warn');
@@ -1023,6 +1074,14 @@
           <input type="text" id="pGoal" placeholder="目标（可选）：杀白角 / 黑棋活 / ..." value="${escapeHtml(problemGoal)}">
         </div>
         <div class="panel">
+          <h3>保存到题库</h3>
+          <div class="row gap8">
+            <input type="text" id="probName" placeholder="题目名称">
+            <button class="btn primary" id="btnSaveProb" style="flex:0 0 70px">保存</button>
+          </div>
+        </div>
+        ${renderProblemList()}
+        <div class="panel">
           <h3>导出 — 复制后粘给 AI 解题</h3>
           <textarea id="problemPreview" readonly style="width:100%; min-height:160px; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font-family:'SF Mono',Menlo,Consolas,monospace; font-size:11px; line-height:1.4; resize:vertical;"></textarea>
           <div class="row gap8" style="margin-top:8px">
@@ -1053,6 +1112,28 @@
             <div class="name">${escapeHtml(j.name)}</div>
             <div class="meta">${j.moves.length}步</div>
             <button class="del" data-del="${j.id}" aria-label="删除">🗑</button>
+          </div>
+        `;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  function renderProblemList() {
+    const all = loadProblems();
+    let html = `<div class="panel"><h3>已保存的题目 (${all.length})</h3>`;
+    if (!all.length) {
+      html += `<div class="empty">尚无题目 · 摆好局面后命名保存</div>`;
+    } else {
+      html += `<div class="joseki-list">`;
+      for (const p of all) {
+        html += `
+          <div class="joseki-item" data-probpick="${p.id}">
+            <div class="name">${escapeHtml(p.name)}${p.goal ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${escapeHtml(p.goal)}</div>` : ''}</div>
+            <div class="meta">${p.setup.length}子 · ${p.firstColor === 1 ? '黑先' : '白先'}</div>
+            <button class="del" data-probdel="${p.id}" aria-label="删除">🗑</button>
           </div>
         `;
       }
@@ -1131,6 +1212,20 @@
     $('btnCopyText') && $('btnCopyText').addEventListener('click', () => copyToClipboard(exportProblemText(), '题目'));
     $('btnCopySgf') && $('btnCopySgf').addEventListener('click', () => copyToClipboard(exportProblemSGF(), 'SGF'));
     $('btnShare') && $('btnShare').addEventListener('click', shareProblem);
+    $('btnSaveProb') && $('btnSaveProb').addEventListener('click', saveCurrentProblem);
+
+    document.querySelectorAll('[data-probpick]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-probdel]')) return;
+        loadProblemById(el.dataset.probpick);
+      });
+    });
+    document.querySelectorAll('[data-probdel]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteProblemById(el.dataset.probdel);
+      });
+    });
 
     refreshProblemExport();
   }
